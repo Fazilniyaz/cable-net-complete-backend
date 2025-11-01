@@ -194,7 +194,11 @@ async function initializeAdmin() {
 
 // Start server (for local only)
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(
+    `Server running on port ${PORT} on ${process.env.NODE_ENV || "development"}`
+  )
+);
 
 // ✅ Export app for Vercel
 module.exports = app;
