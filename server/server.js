@@ -12,7 +12,7 @@ const app = express();
 // ...existing code...
 app.use(
   cors({
-    origin: "*",
+    origin: ["http://localhost:3000", "https://your-production-domain.com"],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
