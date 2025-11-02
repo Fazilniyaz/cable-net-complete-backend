@@ -1,9 +1,23 @@
+// routes/locations.js
 const express = require("express");
 const router = express.Router();
 const Location = require("../models/Location");
-const upload = require("../middleware/upload");
+// const upload = require("../middleware/upload"); // ❌ REMOVED
 // const Admin = require("./models/Admin");
 const Admin = require("../server");
+
+// Optional: Validate Cloudinary URL
+const isValidCloudinaryUrl = (url) => {
+  try {
+    const u = new URL(url);
+    return (
+      u.hostname === "res.cloudinary.com" &&
+      u.pathname.startsWith(`/${process.env.CLOUDINARY_CLOUD_NAME}/`)
+    );
+  } catch {
+    return false;
+  }
+};
 
 // Get all locations
 router.get("/", async (req, res) => {
@@ -47,93 +61,114 @@ router.get("/:id", async (req, res) => {
 });
 
 // Create new location
-// Create new location
-router.post(
-  "/",
-  upload.fields([
-    { name: "image", maxCount: 1 },
-    { name: "image2", maxCount: 1 },
-  ]),
-  async (req, res) => {
-    try {
-      const locationData = {
-        serviceName: req.body.serviceName,
-        serviceType: req.body.serviceType,
-        notes: req.body.notes || "",
-        coordinates: {
-          latitude: parseFloat(req.body.latitude),
-          longitude: parseFloat(req.body.longitude),
-        },
-      };
+router.post("/", async (req, res) => {
+  try {
+    const {
+      serviceName,
+      serviceType,
+      notes,
+      latitude,
+      longitude,
+      image,
+      image2,
+    } = req.body;
 
-      if (req.files?.image?.[0]) {
-        locationData.image = `/uploads/${req.files.image[0].filename}`;
-      }
-      if (req.files?.image2?.[0]) {
-        locationData.image2 = `/uploads/${req.files.image2[0].filename}`;
-      }
-
-      const location = new Location(locationData);
-      const savedLocation = await location.save();
-      const populatedLocation = await Location.findById(savedLocation._id)
-        .populate("serviceName")
-        .populate("serviceType");
-
-      res.status(201).json(populatedLocation);
-    } catch (error) {
-      // Cleanup uploaded files
-      const fs = require("fs");
-      if (req.files?.image?.[0]) fs.unlinkSync(req.files.image[0].path);
-      if (req.files?.image2?.[0]) fs.unlinkSync(req.files.image2[0].path);
-      res.status(400).json({ message: error.message });
+    // Validate required fields
+    if (!serviceName || !serviceType || latitude == null || longitude == null) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
+
+    // Validate Cloudinary URLs (optional but recommended)
+    if (image && !isValidCloudinaryUrl(image)) {
+      return res.status(400).json({ message: "Invalid Cloudinary image URL" });
+    }
+    if (image2 && !isValidCloudinaryUrl(image2)) {
+      return res.status(400).json({ message: "Invalid Cloudinary image2 URL" });
+    }
+
+    const locationData = {
+      serviceName,
+      serviceType,
+      notes: notes || "",
+      coordinates: {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+      },
+      // Accept image URLs directly from frontend
+      ...(image && { image }),
+      ...(image2 && { image2 }),
+    };
+
+    const location = new Location(locationData);
+    const savedLocation = await location.save();
+    const populatedLocation = await Location.findById(savedLocation._id)
+      .populate("serviceName")
+      .populate("serviceType");
+
+    res.status(201).json(populatedLocation);
+  } catch (error) {
+    console.error("Create location error:", error);
+    res.status(400).json({ message: error.message });
   }
-);
+});
 
 // Update location
-// Update location
-router.put(
-  "/:id",
-  upload.fields([
-    { name: "image", maxCount: 1 },
-    { name: "image2", maxCount: 1 },
-  ]),
-  async (req, res) => {
-    try {
-      const updateData = {
-        serviceName: req.body.serviceName,
-        serviceType: req.body.serviceType,
-        notes: req.body.notes,
-        coordinates: {
-          latitude: parseFloat(req.body.coordinates.latitude),
-          longitude: parseFloat(req.body.coordinates.longitude),
-        },
-      };
+router.put("/:id", async (req, res) => {
+  try {
+    const {
+      serviceName,
+      serviceType,
+      notes,
+      latitude,
+      longitude,
+      image,
+      image2,
+    } = req.body;
 
-      if (req.files?.image?.[0]) {
-        updateData.image = `/uploads/${req.files.image[0].filename}`;
-      }
-      if (req.files?.image2?.[0]) {
-        updateData.image2 = `/uploads/${req.files.image2[0].filename}`;
-      }
+    console.log(req.body);
+    const { id } = req.params;
 
-      const location = await Location.findByIdAndUpdate(
-        req.params.id,
-        updateData,
-        { new: true, runValidators: true }
-      )
-        .populate("serviceName")
-        .populate("serviceType");
-
-      if (!location) {
-        return res.status(404).json({ message: "Location not found" });
-      }
-      res.json(location);
-    } catch (error) {
-      res.status(400).json({ message: error.message });
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: "Valid coordinates required" });
     }
+
+    const updateData = {
+      serviceName,
+      serviceType,
+      notes,
+      coordinates: {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+      },
+      // Only update image fields if provided
+      ...(image !== undefined && { image }),
+      ...(image2 !== undefined && { image2 }),
+    };
+
+    // Validate Cloudinary URLs
+    if (image && !isValidCloudinaryUrl(image)) {
+      return res.status(400).json({ message: "Invalid Cloudinary image URL" });
+    }
+    if (image2 && !isValidCloudinaryUrl(image2)) {
+      return res.status(400).json({ message: "Invalid Cloudinary image2 URL" });
+    }
+
+    const location = await Location.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    })
+      .populate("serviceName")
+      .populate("serviceType");
+
+    if (!location) {
+      return res.status(404).json({ message: "Location not found" });
+    }
+    res.json(location);
+  } catch (error) {
+    console.error("Update location error:", error);
+    res.status(400).json({ message: error.message });
   }
-);
+});
 
 // Delete location
 router.delete("/:id/:adminId", async (req, res) => {
