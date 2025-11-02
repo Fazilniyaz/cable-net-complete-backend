@@ -62,7 +62,7 @@ router.get("/:id", async (req, res) => {
 
 // Create new location
 router.post("/", async (req, res) => {
-  console.log(req.body);
+  console.log("Post request hit :-", req.body);
   try {
     const {
       serviceName,
