@@ -12,7 +12,11 @@ const app = express();
 // ...existing code...
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://cable-net-client.vercel.app"],
+    origin: [
+      "http://localhost:3000",
+      "https://cable-net-client.vercel.app",
+      "https://cable-net-fe.vercel.app",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
