@@ -9,7 +9,6 @@ require("dotenv").config();
 const app = express();
 
 // Middleware
-// ...existing code...
 app.use(
   cors({
     origin: [
@@ -22,32 +21,61 @@ app.use(
     credentials: true,
   })
 );
-// ...existing code...
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ✅ Use environment variable for DB connection
+// ✅ FIXED: Improved MongoDB connection handling
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// ✅ Maintain a single global connection (important for Vercel)
-let isConnected = false;
+// Configure mongoose for serverless
+mongoose.set("strictQuery", false);
+mongoose.set("bufferCommands", false); // Disable buffering for serverless
+
 const connectDB = async () => {
-  if (isConnected) return;
   try {
+    // Check if already connected
+    if (mongoose.connection.readyState === 1) {
+      return mongoose.connection;
+    }
+
+    // If connecting, wait for it
+    if (mongoose.connection.readyState === 2) {
+      return new Promise((resolve, reject) => {
+        mongoose.connection.once("connected", () =>
+          resolve(mongoose.connection)
+        );
+        mongoose.connection.once("error", reject);
+      });
+    }
+
+    // Connect with optimized settings for serverless
     const conn = await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+      minPoolSize: 1, // Minimum pool size
     });
-    isConnected = conn.connections[0].readyState === 1;
+
     console.log("✅ MongoDB connected successfully");
-    await initializeAdmin();
+
+    // Handle connection events
+    mongoose.connection.on("error", (err) => {
+      console.error("MongoDB connection error:", err);
+    });
+
+    mongoose.connection.on("disconnected", () => {
+      console.log("MongoDB disconnected");
+    });
+
+    return conn;
   } catch (err) {
     console.error("❌ MongoDB connection error:", err);
+    throw err;
   }
 };
-
-connectDB(); // Call once on startup
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "cable_network_secret_key_2024";
@@ -62,7 +90,23 @@ const adminSchema = new mongoose.Schema({
 });
 
 const Admin = mongoose.models.Admin || mongoose.model("Admin", adminSchema);
-module.exports = Admin;
+
+// ✅ FIXED: Middleware to ensure DB connection before each request
+const ensureDBConnection = async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    res.status(503).json({
+      message: "Database connection failed. Please try again.",
+      error: error.message,
+    });
+  }
+};
+
+// Apply to all routes
+app.use(ensureDBConnection);
 
 // JWT Middleware
 const authenticateToken = (req, res, next) => {
@@ -83,7 +127,6 @@ const authenticateToken = (req, res, next) => {
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-    await connectDB(); // ensure DB is connected
 
     if (!username || !password)
       return res
@@ -124,7 +167,6 @@ app.put("/api/admin/:adminId/geojson", async (req, res) => {
   try {
     const { geojson } = req.body;
     const { adminId } = req.params;
-    await connectDB();
 
     if (!geojson || typeof geojson !== "object")
       return res.status(400).json({ message: "Valid GeoJSON required" });
@@ -163,23 +205,24 @@ app.get("/api/health", (req, res) => {
   res.json({
     message: "Cable Network Management API is running",
     timestamp: new Date().toISOString(),
+    dbStatus:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
   });
 });
 
-// Import routes (if needed)
+// Import routes
 const serviceRoutes = require("./routes/services");
 const serviceTypeRoutes = require("./routes/serviceTypes");
 const locationRoutes = require("./routes/locations");
-// const locationNameRoutes = require("./routes/locationNames");
 
-// app.use("/api/location-names", authenticateToken, locationNameRoutes);
 app.use("/api/services", authenticateToken, serviceRoutes);
 app.use("/api/service-types", authenticateToken, serviceTypeRoutes);
 app.use("/api/locations", authenticateToken, locationRoutes);
 
-// Initialize default admin (run once)
+// Initialize default admin
 async function initializeAdmin() {
   try {
+    await connectDB();
     const existingAdmin = await Admin.findOne({ username: "admin" });
     if (!existingAdmin) {
       const hashedPassword = await bcrypt.hash("admin123", 10);
@@ -196,6 +239,21 @@ async function initializeAdmin() {
   }
 }
 
+// Initialize admin on startup (for local development)
+connectDB().then(() => initializeAdmin());
+
+// Graceful shutdown (for local development)
+process.on("SIGINT", async () => {
+  try {
+    await mongoose.connection.close();
+    console.log("MongoDB connection closed");
+    process.exit(0);
+  } catch (err) {
+    console.error("Error during shutdown:", err);
+    process.exit(1);
+  }
+});
+
 // Start server (for local only)
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
@@ -204,5 +262,6 @@ app.listen(PORT, () =>
   )
 );
 
-// ✅ Export app for Vercel
+// Export app for Vercel
 module.exports = app;
+module.exports.Admin = Admin;

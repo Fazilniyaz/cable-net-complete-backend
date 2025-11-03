@@ -2,9 +2,9 @@
 const express = require("express");
 const router = express.Router();
 const Location = require("../models/Location");
-// const upload = require("../middleware/upload"); // ❌ REMOVED
-// const Admin = require("./models/Admin");
-const Admin = require("../server");
+
+// ✅ FIXED: Correct Admin import
+const { Admin } = require("../server");
 
 // Optional: Validate Cloudinary URL
 const isValidCloudinaryUrl = (url) => {
@@ -24,9 +24,19 @@ router.get("/", async (req, res) => {
   try {
     const locations = await Location.find()
       .populate("serviceName")
-      .populate("serviceType");
+      .populate("serviceType")
+      .maxTimeMS(10000); // 10 second timeout
     res.json(locations);
   } catch (error) {
+    console.error("Get locations error:", error);
+    if (
+      error.name === "MongooseError" &&
+      error.message.includes("buffering timed out")
+    ) {
+      return res.status(503).json({
+        message: "Database connection timeout. Please Login again",
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 });
@@ -38,9 +48,11 @@ router.get("/filter/service-type/:serviceTypeId", async (req, res) => {
       serviceType: req.params.serviceTypeId,
     })
       .populate("serviceName")
-      .populate("serviceType");
+      .populate("serviceType")
+      .maxTimeMS(10000);
     res.json(locations);
   } catch (error) {
+    console.error("Filter locations error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -50,12 +62,14 @@ router.get("/:id", async (req, res) => {
   try {
     const location = await Location.findById(req.params.id)
       .populate("serviceName")
-      .populate("serviceType");
+      .populate("serviceType")
+      .maxTimeMS(10000);
     if (!location) {
       return res.status(404).json({ message: "Location not found" });
     }
     res.json(location);
   } catch (error) {
+    console.error("Get location error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -95,7 +109,6 @@ router.post("/", async (req, res) => {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
       },
-      // Accept image URLs directly from frontend
       ...(image && { image }),
       ...(image2 && { image2 }),
     };
@@ -104,7 +117,8 @@ router.post("/", async (req, res) => {
     const savedLocation = await location.save();
     const populatedLocation = await Location.findById(savedLocation._id)
       .populate("serviceName")
-      .populate("serviceType");
+      .populate("serviceType")
+      .maxTimeMS(10000);
 
     res.status(201).json(populatedLocation);
   } catch (error) {
@@ -141,7 +155,6 @@ router.put("/:id", async (req, res) => {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
       },
-      // Only update image fields if provided
       ...(image !== undefined && { image }),
       ...(image2 !== undefined && { image2 }),
     };
@@ -159,7 +172,8 @@ router.put("/:id", async (req, res) => {
       runValidators: true,
     })
       .populate("serviceName")
-      .populate("serviceType");
+      .populate("serviceType")
+      .maxTimeMS(10000);
 
     if (!location) {
       return res.status(404).json({ message: "Location not found" });
@@ -176,23 +190,25 @@ router.delete("/:id/:adminId", async (req, res) => {
   try {
     const { id, adminId } = req.params;
 
-    // 1️. Find and delete the location
-    const deletedLocation = await Location.findOneAndDelete({ _id: id });
+    // Find and delete the location
+    const deletedLocation = await Location.findOneAndDelete({
+      _id: id,
+    }).maxTimeMS(10000);
 
     if (!deletedLocation) {
       return res.status(404).json({ message: "Location not found" });
     }
 
-    // 2️. Extract coordinates from deleted location
+    // Extract coordinates from deleted location
     const { latitude, longitude } = deletedLocation.coordinates;
 
-    // 3️. Find the admin
-    const admin = await Admin.findById(adminId);
+    // Find the admin
+    const admin = await Admin.findById(adminId).maxTimeMS(10000);
     if (!admin || !admin.geojson) {
       return res.status(404).json({ message: "Admin or geojson not found" });
     }
 
-    // 4️. Remove that specific coordinate from admin.geojson.features (if it's a FeatureCollection)
+    // Remove that specific coordinate from admin.geojson.features
     const updatedAdmin = await Admin.findByIdAndUpdate(
       adminId,
       {
@@ -204,7 +220,7 @@ router.delete("/:id/:adminId", async (req, res) => {
         },
       },
       { new: true }
-    );
+    ).maxTimeMS(10000);
 
     res.json({
       message: "Location deleted and geojson updated successfully",
@@ -216,6 +232,7 @@ router.delete("/:id/:adminId", async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Delete location error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -223,12 +240,14 @@ router.delete("/:id/:adminId", async (req, res) => {
 // Get dashboard statistics
 router.get("/stats/dashboard", async (req, res) => {
   try {
-    const totalLocations = await Location.countDocuments();
+    const totalLocations = await Location.countDocuments().maxTimeMS(10000);
     const Service = require("../models/Service");
     const ServiceType = require("../models/ServiceType");
 
-    const totalServices = await Service.countDocuments();
-    const totalServiceTypes = await ServiceType.countDocuments();
+    const totalServices = await Service.countDocuments().maxTimeMS(10000);
+    const totalServiceTypes = await ServiceType.countDocuments().maxTimeMS(
+      10000
+    );
 
     res.json({
       totalLocations,
@@ -236,6 +255,7 @@ router.get("/stats/dashboard", async (req, res) => {
       totalServiceTypes,
     });
   } catch (error) {
+    console.error("Stats error:", error);
     res.status(500).json({ message: error.message });
   }
 });
