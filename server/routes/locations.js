@@ -4,7 +4,7 @@ const router = express.Router();
 const Location = require("../models/Location");
 
 // ✅ FIXED: Correct Admin import
-const Admin = require("../server");
+const { Admin } = require("../server");
 
 // Optional: Validate Cloudinary URL
 const isValidCloudinaryUrl = (url) => {
@@ -187,7 +187,6 @@ router.put("/:id", async (req, res) => {
 
 // Delete location
 router.delete("/:id/:adminId", async (req, res) => {
-  console.log("Delete request hit :-", req.params);
   try {
     const { id, adminId } = req.params;
 
@@ -202,10 +201,6 @@ router.delete("/:id/:adminId", async (req, res) => {
 
     // Extract coordinates from deleted location
     const { latitude, longitude } = deletedLocation.coordinates;
-
-    let debug = await Admin.find();
-
-    console.log("list of admins", debug);
 
     // Find the admin
     const admin = await Admin.findById(adminId).maxTimeMS(10000);
