@@ -203,6 +203,10 @@ router.delete("/:id/:adminId", async (req, res) => {
     // Extract coordinates from deleted location
     const { latitude, longitude } = deletedLocation.coordinates;
 
+    let debug = await Admin.find();
+
+    console.log("list of admins", debug);
+
     // Find the admin
     const admin = await Admin.findById(adminId).maxTimeMS(10000);
     if (!admin || !admin.geojson) {
