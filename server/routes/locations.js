@@ -187,6 +187,7 @@ router.put("/:id", async (req, res) => {
 
 // Delete location
 router.delete("/:id/:adminId", async (req, res) => {
+  console.log("Delete request hit :-", req.params);
   try {
     const { id, adminId } = req.params;
 
