@@ -4,7 +4,7 @@ const router = express.Router();
 const Location = require("../models/Location");
 
 // ✅ FIXED: Correct Admin import
-const { Admin } = require("../server");
+const Admin = require("../server");
 
 // Optional: Validate Cloudinary URL
 const isValidCloudinaryUrl = (url) => {
