@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const path = require("path");
 require("dotenv").config();
+const Admin = require("./models/Admin");
 
 const app = express();
 
@@ -79,17 +80,6 @@ const connectDB = async () => {
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "cable_network_secret_key_2024";
-
-// Admin Schema
-const adminSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, default: "admin" },
-  createdAt: { type: Date, default: Date.now },
-  geojson: { type: Object, default: null },
-});
-
-const Admin = mongoose.models.Admin || mongoose.model("Admin", adminSchema);
 
 // ✅ FIXED: Middleware to ensure DB connection before each request
 const ensureDBConnection = async (req, res, next) => {
@@ -263,4 +253,5 @@ app.listen(PORT, () =>
 );
 
 // Export app for Vercel
-module.exports = { app, Admin };
+module.exports = app;
+module.exports.Admin = Admin;
