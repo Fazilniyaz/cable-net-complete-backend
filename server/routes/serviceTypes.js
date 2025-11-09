@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const ServiceType = require("../models/ServiceType");
 const Location = require("../models/Location"); // ← Import Location
-const mongoose = require("mongoose");
 
 // Get all service types
 router.get("/", async (req, res) => {
@@ -79,14 +78,11 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const serviceTypeId = req.params.id;
-    const mongoServiceType = new mongoose.Types.ObjectId(req.params.id);
 
     // Check if any location references this service type
-    const locationExists = await Location.findById({
-      serviceType: mongoServiceType,
+    const locationExists = await Location.exists({
+      serviceType: serviceTypeId,
     });
-
-    console.log("Location exists check:", locationExists);
 
     if (locationExists) {
       return res.status(403).json({
