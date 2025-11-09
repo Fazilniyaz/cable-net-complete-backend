@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const ServiceType = require("../models/ServiceType");
 const Location = require("../models/Location"); // ← Import Location
+const mongoose = require("mongoose");
 
 // Get all service types
 router.get("/", async (req, res) => {
