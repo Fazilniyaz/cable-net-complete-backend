@@ -1,4 +1,4 @@
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
 
 const serviceTypeSchema = new mongoose.Schema({
   name: {
@@ -9,7 +9,7 @@ const serviceTypeSchema = new mongoose.Schema({
   colorForMarking: {
     type: String,
     required: true,
-    match: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, // Hex color validation
+    // match: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, // Hex color validation
   },
   icon: {
     type: String,
@@ -28,12 +28,12 @@ const serviceTypeSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-})
+});
 
 // Update the updatedAt field before saving
 serviceTypeSchema.pre("save", function (next) {
-  this.updatedAt = Date.now()
-  next()
-})
+  this.updatedAt = Date.now();
+  next();
+});
 
-module.exports = mongoose.model("ServiceType", serviceTypeSchema)
+module.exports = mongoose.model("ServiceType", serviceTypeSchema);
