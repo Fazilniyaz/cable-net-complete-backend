@@ -84,6 +84,8 @@ router.delete("/:id", async (req, res) => {
       serviceType: serviceTypeId,
     });
 
+    console.log("Location exists check:", locationExists);
+
     if (locationExists) {
       return res.status(403).json({
         message:
