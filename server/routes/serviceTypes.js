@@ -80,7 +80,7 @@ router.delete("/:id", async (req, res) => {
     const serviceTypeId = req.params.id;
 
     // Check if any location references this service type
-    const locationExists = await Location.exists({
+    const locationExists = await Location.findById({
       serviceType: serviceTypeId,
     });
 
