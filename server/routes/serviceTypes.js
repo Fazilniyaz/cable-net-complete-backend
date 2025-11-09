@@ -79,7 +79,7 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const serviceTypeId = req.params.id;
-    const mongoServiceType = mongoose.Types.ObjectId(req.params.id);
+    const mongoServiceType = new mongoose.Types.ObjectId(req.params.id);
 
     // Check if any location references this service type
     const locationExists = await Location.findById({
